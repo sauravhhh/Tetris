@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#10102a">
+    <meta name="description" content="Tetris — the classic block-stacking puzzle. Installable PWA, works offline.">
+    <title>Tetris</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #10102a;
+            --panel: #1a1b3d;
+            --ink: #f4f3ff;
+            --muted: #8f8fc0;
+            --accent: #fb923c;
+            --radius: 14px;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px 12px calc(20px + env(safe-area-inset-bottom));
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .wrap { width: 100%; max-width: 430px; display: flex; flex-direction: column; align-items: center; }
+
+        .top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; align-self: flex-start; }
+        .top img { width: 42px; height: 42px; border-radius: 12px; box-shadow: 0 4px 14px rgba(251,146,60,.35); }
+        .top h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.4px; }
+
+        .play-area { display: flex; gap: 10px; align-items: flex-start; }
+        .board-frame { position: relative; }
+        canvas#game {
+            height: min(56vh, 540px);
+            aspect-ratio: 1 / 2;
+            background: #141433;
+            border-radius: var(--radius);
+            box-shadow: 0 12px 40px rgba(0,0,0,.45);
+            touch-action: none;
+            display: block;
+        }
+        .side { display: flex; flex-direction: column; gap: 8px; width: 86px; }
+        .card {
+            background: var(--panel); border-radius: 10px; padding: 8px 6px;
+            text-align: center;
+        }
+        .card .lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); margin-bottom: 3px; }
+        .card .val { font-size: 16px; font-weight: 800; }
+        canvas#next { width: 100%; aspect-ratio: 1 / 1; display: block; }
+
+        .controls { display: flex; gap: 8px; margin-top: 12px; width: 100%; max-width: 340px; }
+        .cbtn {
+            flex: 1; border: none; border-radius: 12px; cursor: pointer;
+            background: var(--panel); color: var(--ink);
+            font-size: 22px; padding: 14px 0; min-height: 58px;
+        }
+        .cbtn:active { background: #26265a; transform: scale(.96); }
+        .cbtn.wide { flex: 1.4; background: linear-gradient(135deg, #fb923c, #f97316); color: #2a1503; font-weight: 800; font-size: 15px; }
+        .cbtn.wide:active { filter: brightness(1.1); }
+
+        .overlay {
+            position: absolute; inset: 0; z-index: 20;
+            background: rgba(16,16,42,.85); backdrop-filter: blur(3px);
+            border-radius: var(--radius);
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+            opacity: 0; pointer-events: none; transition: opacity .25s ease;
+            padding: 20px; text-align: center;
+        }
+        .overlay.show { opacity: 1; pointer-events: auto; }
+        .overlay .big { font-size: 48px; }
+        .overlay h2 { font-size: 28px; font-weight: 800; }
+        .overlay p { color: var(--muted); font-size: 14px; margin-bottom: 8px; }
+        .overlay p b { color: var(--ink); }
+        .overlay button {
+            border: none; border-radius: 12px; cursor: pointer;
+            background: linear-gradient(135deg, #fb923c, #f97316);
+            color: #2a1503; font-size: 16px; font-weight: 800; padding: 14px 28px; min-height: 52px;
+        }
+        .overlay button:active { transform: scale(.96); }
+
+        .tip { text-align: center; margin-top: 10px; font-size: 12px; color: var(--muted); opacity: .8; line-height: 1.6; }
+        footer { text-align: center; margin-top: 10px; font-size: 13px; color: var(--muted); }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="top">
+            <img src="icon-192.png" alt="Tetris icon">
+            <h1>Tetris</h1>
+        </div>
+
+        <div class="play-area">
+            <div class="board-frame">
+                <canvas id="game" width="300" height="600"></canvas>
+                <div class="overlay" id="overlay">
+                    <div class="big" id="ovEmoji">🧱</div>
+                    <h2 id="ovTitle">Game Over</h2>
+                    <p id="ovSub"></p>
+                    <button id="ovBtn">Play again</button>
+                </div>
+            </div>
+            <div class="side">
+                <div class="card"><div class="lbl">Next</div><canvas id="next" width="120" height="120"></canvas></div>
+                <div class="card"><div class="lbl">Score</div><div class="val" id="score">0</div></div>
+                <div class="card"><div class="lbl">Lines</div><div class="val" id="lines">0</div></div>
+                <div class="card"><div class="lbl">Level</div><div class="val" id="level">1</div></div>
+                <div class="card"><div class="lbl">Best</div><div class="val" id="best">0</div></div>
+                <div class="card" id="pauseCard" style="cursor:pointer"><div class="lbl">Pause</div><div class="val" id="pauseIcon">⏸</div></div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="cbtn" id="btnLeft" aria-label="Move left">◀</button>
+            <button class="cbtn" id="btnRight" aria-label="Move right">▶</button>
+            <button class="cbtn" id="btnRot" aria-label="Rotate">⟲</button>
+            <button class="cbtn" id="btnDown" aria-label="Soft drop">▼</button>
+            <button class="cbtn wide" id="btnDrop">DROP</button>
+        </div>
+
+        <div class="tip">Swipe on the board to move · tap to rotate · flick down to drop</div>
+        <footer>Made with ❤️ by Sauravhhh</footer>
+    </div>
+
+    <script src="game-logic.js"></script>
+    <script>
+        (function () {
+            'use strict';
+            var T = window.TetrisLogic;
+            var COLORS = ['#22d3ee', '#facc15', '#c084fc', '#4ade80', '#f87171', '#60a5fa', '#fb923c'];
+
+            var canvas = document.getElementById('game');
+            var ctx = canvas.getContext('2d');
+            var nextCanvas = document.getElementById('next');
+            var nctx = nextCanvas.getContext('2d');
+            var scoreEl = document.getElementById('score');
+            var linesEl = document.getElementById('lines');
+            var levelEl = document.getElementById('level');
+            var bestEl = document.getElementById('best');
+            var overlay = document.getElementById('overlay');
+            var ovSub = document.getElementById('ovSub');
+
+            var CELL = 30; // canvas is 300x600
+            var state = null;
+            var timerId = null;
+            var paused = false;
+            var best = parseInt(localStorage.getItem('tetris_best') || '0', 10) || 0;
+            bestEl.textContent = best;
+
+            function roundRect(c, x, y, w, h, r) {
+                c.beginPath();
+                c.moveTo(x + r, y);
+                c.arcTo(x + w, y, x + w, y + h, r);
+                c.arcTo(x + w, y + h, x, y + h, r);
+                c.arcTo(x, y + h, x, y, r);
+                c.arcTo(x, y, x + w, y, r);
+                c.closePath();
+            }
+
+            function drawCell(c, x, y, size, color, alpha) {
+                c.save();
+                c.globalAlpha = alpha === undefined ? 1 : alpha;
+                var pad = Math.max(1, size * 0.06);
+                roundRect(c, x + pad, y + pad, size - pad * 2, size - pad * 2, size * 0.18);
+                c.fillStyle = color;
+                c.fill();
+                // glossy top highlight
+                c.globalAlpha *= 0.35;
+                roundRect(c, x + pad * 1.6, y + pad * 1.6, size - pad * 3.2, size * 0.32, size * 0.12);
+                c.fillStyle = '#ffffff';
+                c.fill();
+                c.restore();
+            }
+
+            function render() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                // grid lines
+                ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+                ctx.lineWidth = 1;
+                for (var x = 0; x <= T.COLS; x++) {
+                    ctx.beginPath(); ctx.moveTo(x * CELL + .5, 0); ctx.lineTo(x * CELL + .5, canvas.height); ctx.stroke();
+                }
+                for (var y = 0; y <= T.ROWS; y++) {
+                    ctx.beginPath(); ctx.moveTo(0, y * CELL + .5); ctx.lineTo(canvas.width, y * CELL + .5); ctx.stroke();
+                }
+                // locked cells
+                for (var r = 0; r < T.ROWS; r++)
+                    for (var c2 = 0; c2 < T.COLS; c2++) {
+                        var v = state.grid[r][c2];
+                        if (v !== -1) drawCell(ctx, c2 * CELL, r * CELL, CELL, COLORS[v]);
+                    }
+                if (state.piece) {
+                    // ghost
+                    var gy = T.ghostY(state);
+                    T.pieceCells(state.piece).forEach(function (cl) {
+                        var gx = (state.piece.x + cl[0]) * CELL, gyy = (gy + cl[1]) * CELL;
+                        if (gyy >= 0) drawCell(ctx, gx, gyy, CELL, COLORS[T.SHAPES[state.piece.type].color], 0.22);
+                    });
+                    // current piece
+                    T.pieceCells(state.piece).forEach(function (cl) {
+                        var px = (state.piece.x + cl[0]) * CELL, py = (state.piece.y + cl[1]) * CELL;
+                        if (py >= 0) drawCell(ctx, px, py, CELL, COLORS[T.SHAPES[state.piece.type].color]);
+                    });
+                }
+                renderNext();
+            }
+
+            function renderNext() {
+                nctx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+                if (!state || !state.next) return;
+                var shape = T.SHAPES[state.next];
+                var cells = T.pieceCells({ type: state.next, rot: 0 });
+                var size = shape.size;
+                var s = nextCanvas.width / 5;
+                var ox = (nextCanvas.width - size * s) / 2, oy = (nextCanvas.height - size * s) / 2;
+                cells.forEach(function (cl) {
+                    drawCell(nctx, ox + cl[0] * s, oy + cl[1] * s, s, COLORS[shape.color]);
+                });
+            }
+
+            function updateHud() {
+                scoreEl.textContent = state.score;
+                linesEl.textContent = state.lines;
+                levelEl.textContent = state.level;
+                if (state.score > best) {
+                    best = state.score;
+                    localStorage.setItem('tetris_best', String(best));
+                    bestEl.textContent = best;
+                }
+            }
+
+            function restartLoop() {
+                if (timerId) clearInterval(timerId);
+                timerId = setInterval(function () {
+                    if (paused || state.over) return;
+                    var res = T.tick(state);
+                    if (res === 'locked' || res === 'moved') { updateHud(); maybeRespeed(); }
+                    if (res === 'over') gameOver();
+                    render();
+                }, T.dropIntervalMs(state.level));
+            }
+            var lastLevel = 1;
+            function maybeRespeed() {
+                if (state.level !== lastLevel) { lastLevel = state.level; restartLoop(); }
+            }
+
+            function gameOver() {
+                if (timerId) clearInterval(timerId);
+                timerId = null;
+                ovSub.innerHTML = 'Score <b>' + state.score + '</b> · Lines <b>' + state.lines + '</b> · Level <b>' + state.level + '</b>';
+                overlay.classList.add('show');
+                if (navigator.vibrate) { try { navigator.vibrate([80, 50, 80]); } catch (e) {} }
+            }
+
+            function newGame() {
+                state = T.createGame();
+                lastLevel = 1;
+                paused = false;
+                overlay.classList.remove('show');
+                updateHud();
+                render();
+                restartLoop();
+            }
+
+            function doRotate() { if (!paused && T.rotate(state, 1)) render(); }
+            function doHardDrop() {
+                if (paused || state.over) return;
+                T.hardDrop(state);
+                var res = T.tick(state); // lock immediately + spawn
+                // tick moves down first; emulate lock: force lock path
+                updateHud(); maybeRespeed();
+                if (res === 'over' || state.over) gameOver();
+                render();
+                if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} }
+            }
+
+            // Buttons (hold-to-repeat for left/right/down)
+            function holdRepeat(el, fn) {
+                var iv = null, to = null;
+                function start(e) {
+                    e.preventDefault();
+                    fn();
+                    to = setTimeout(function () { iv = setInterval(fn, 70); }, 280);
+                }
+                function stop() { clearTimeout(to); clearInterval(iv); iv = to = null; }
+                el.addEventListener('pointerdown', start);
+                ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { el.addEventListener(ev, stop); });
+                el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+            }
+            holdRepeat(document.getElementById('btnLeft'), function () { if (!paused && T.move(state, -1, 0)) render(); });
+            holdRepeat(document.getElementById('btnRight'), function () { if (!paused && T.move(state, 1, 0)) render(); });
+            holdRepeat(document.getElementById('btnDown'), function () {
+                if (paused || state.over) return;
+                if (T.move(state, 0, 1)) { state.score += 1; updateHud(); render(); }
+                else { T.lockPiece(state); updateHud(); maybeRespeed(); if (!T.spawn(state)) gameOver(); render(); }
+            });
+            document.getElementById('btnRot').addEventListener('click', doRotate);
+            document.getElementById('btnDrop').addEventListener('click', doHardDrop);
+
+            // Keyboard
+            document.addEventListener('keydown', function (e) {
+                if (e.repeat && (e.key === ' ' || e.key === 'ArrowUp')) return;
+                switch (e.key) {
+                    case 'ArrowLeft': e.preventDefault(); if (!paused && T.move(state, -1, 0)) render(); break;
+                    case 'ArrowRight': e.preventDefault(); if (!paused && T.move(state, 1, 0)) render(); break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        if (!paused && !state.over) {
+                            if (T.move(state, 0, 1)) { state.score += 1; updateHud(); render(); }
+                        }
+                        break;
+                    case 'ArrowUp': case 'x': case 'X': e.preventDefault(); doRotate(); break;
+                    case ' ': e.preventDefault(); doHardDrop(); break;
+                    case 'p': case 'P': togglePause(); break;
+                }
+            });
+
+            // Touch gestures on the board
+            var tsx = 0, tsy = 0, tst = 0, swiped = false, lastGX = 0, lastGY = 0;
+            canvas.addEventListener('touchstart', function (e) {
+                var t = e.changedTouches[0];
+                tsx = lastGX = t.clientX; tsy = lastGY = t.clientY; tst = Date.now(); swiped = false;
+            }, { passive: true });
+            canvas.addEventListener('touchmove', function (e) {
+                e.preventDefault();
+                if (paused || state.over) return;
+                var t = e.changedTouches[0];
+                var dx = t.clientX - lastGX, dy = t.clientY - lastGY;
+                var cellPx = canvas.clientWidth / T.COLS;
+                if (Math.abs(t.clientX - tsx) > 14 || Math.abs(t.clientY - tsy) > 14) swiped = true;
+                while (dx > cellPx * 0.9) { if (T.move(state, 1, 0)) render(); lastGX += cellPx * 0.9; dx -= cellPx * 0.9; }
+                while (dx < -cellPx * 0.9) { if (T.move(state, -1, 0)) render(); lastGX -= cellPx * 0.9; dx += cellPx * 0.9; }
+                while (dy > cellPx * 0.9) {
+                    if (T.move(state, 0, 1)) { state.score += 1; updateHud(); render(); }
+                    lastGY += cellPx * 0.9; dy -= cellPx * 0.9;
+                }
+            }, { passive: false });
+            canvas.addEventListener('touchend', function (e) {
+                if (paused || state.over) return;
+                var t = e.changedTouches[0];
+                var dt = Date.now() - tst;
+                var ddy = t.clientY - tsy;
+                if (!swiped && dt < 300) { doRotate(); return; }           // tap = rotate
+                if (ddy > 70 && dt < 300) doHardDrop();                    // quick flick down = hard drop
+            }, { passive: true });
+
+            function togglePause() {
+                if (state.over) return;
+                paused = !paused;
+                document.getElementById('pauseIcon').textContent = paused ? '▶' : '⏸';
+            }
+            document.getElementById('pauseCard').addEventListener('click', togglePause);
+            document.addEventListener('visibilitychange', function () {
+                if (document.hidden && !state.over) paused = true;
+            });
+
+            document.getElementById('ovBtn').addEventListener('click', newGame);
+
+            newGame();
+
+            // PWA service worker
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function () {
+                    navigator.serviceWorker.register('sw.js').catch(function (err) {
+                        console.warn('SW registration failed:', err);
+                    });
+                });
+            }
+        })();
+    </script>
+</body>
+</html>
