@@ -64,9 +64,13 @@
             flex: 1; border: none; border-radius: 12px; cursor: pointer;
             background: var(--panel); color: var(--ink);
             font-size: 22px; padding: 14px 0; min-height: 58px;
+            display: flex; align-items: center; justify-content: center;
         }
+        .cbtn svg { width: 26px; height: 26px; }
         .cbtn:active { background: #26265a; transform: scale(.96); }
-        .cbtn.wide { flex: 1.4; background: linear-gradient(135deg, #fb923c, #f97316); color: #2a1503; font-weight: 800; font-size: 15px; }
+        .cbtn.wide { flex: 1.4; background: linear-gradient(135deg, #fb923c, #f97316); color: #2a1503; font-weight: 800; font-size: 15px; gap: 8px; }
+        #pauseIcon { display: flex; justify-content: center; }
+        #pauseIcon svg { width: 20px; height: 20px; }
         .cbtn.wide:active { filter: brightness(1.1); }
 
         .overlay {
@@ -116,16 +120,16 @@
                 <div class="card"><div class="lbl">Lines</div><div class="val" id="lines">0</div></div>
                 <div class="card"><div class="lbl">Level</div><div class="val" id="level">1</div></div>
                 <div class="card"><div class="lbl">Best</div><div class="val" id="best">0</div></div>
-                <div class="card" id="pauseCard" style="cursor:pointer"><div class="lbl">Pause</div><div class="val" id="pauseIcon">⏸</div></div>
+                <div class="card" id="pauseCard" style="cursor:pointer"><div class="lbl">Pause</div><div class="val" id="pauseIcon"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.2"/><rect x="14" y="4" width="4" height="16" rx="1.2"/></svg></div></div>
             </div>
         </div>
 
         <div class="controls">
-            <button class="cbtn" id="btnLeft" aria-label="Move left">◀</button>
-            <button class="cbtn" id="btnRight" aria-label="Move right">▶</button>
-            <button class="cbtn" id="btnRot" aria-label="Rotate">⟲</button>
-            <button class="cbtn" id="btnDown" aria-label="Soft drop">▼</button>
-            <button class="cbtn wide" id="btnDrop">DROP</button>
+            <button class="cbtn" id="btnLeft" aria-label="Move left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+            <button class="cbtn" id="btnRight" aria-label="Move right"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+            <button class="cbtn" id="btnRot" aria-label="Rotate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+            <button class="cbtn" id="btnDown" aria-label="Soft drop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+            <button class="cbtn wide" id="btnDrop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="M7 9l5 5 5-5"/><path d="M5 21h14"/></svg>DROP</button>
         </div>
 
         <div class="tip">Swipe on the board to move · tap to rotate · flick down to drop</div>
@@ -354,10 +358,12 @@
                 if (ddy > 70 && dt < 300) doHardDrop();                    // quick flick down = hard drop
             }, { passive: true });
 
+            var ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.2"/><rect x="14" y="4" width="4" height="16" rx="1.2"/></svg>';
+            var ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.8v14.4c0 .8.9 1.3 1.6.9l11.2-7.2c.6-.4.6-1.4 0-1.8L8.6 3.9c-.7-.4-1.6.1-1.6.9z"/></svg>';
             function togglePause() {
                 if (state.over) return;
                 paused = !paused;
-                document.getElementById('pauseIcon').textContent = paused ? '▶' : '⏸';
+                document.getElementById('pauseIcon').innerHTML = paused ? ICON_PLAY : ICON_PAUSE;
             }
             document.getElementById('pauseCard').addEventListener('click', togglePause);
             document.addEventListener('visibilitychange', function () {
